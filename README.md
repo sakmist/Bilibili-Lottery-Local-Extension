@@ -51,4 +51,4 @@
 
 ## 参考
 
-- 原项目：`（[bilibili_dynamic_lottery-master](https://github.com/hexie2108/bilibili_dynamic_lottery)）`
+- 原项目：[bilibili_dynamic_lottery-master](https://github.com/hexie2108/bilibili_dynamic_lottery)

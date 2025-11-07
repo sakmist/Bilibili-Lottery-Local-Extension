@@ -204,7 +204,7 @@ async function run_task_with_progress(label, runner) {
 function handle_task_error(error, stage_key) {
     if (error?.status === 412 && error?.isResumable) {
         const stage_label = STAGE_LABEL_MAP[stage_key] || '数据';
-        const resume_message = `触发 B 站风控 (HTTP 412)，${stage_label}加载已暂停。<br/>请等待几秒后点击“继续”从断点恢复。`;
+        const resume_message = `触发 B 站风控 (HTTP 412)，${stage_label}加载已暂停。<br/>请等待一段时间后点击“继续”从断点继续读取评论，不要刷新网页。`;
         show_error_modal(true, {
             content: resume_message,
             show_confirm_button: true,

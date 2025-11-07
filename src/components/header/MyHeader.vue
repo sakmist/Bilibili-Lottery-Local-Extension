@@ -86,11 +86,14 @@ function on_click_login(event) {
         <div class="collapse navbar-collapse" id="top-menu">
           <ul class="navbar-nav ">
             <li class="nav-item">
-              <a href="/" class="nav-link"><font-awesome-icon :icon="faHouse" class="align-middle me-1" /> 首页</a>
+              <a href="https://mikuclub.cc/" class="nav-link"><font-awesome-icon :icon="faHouse" class="align-middle me-1" /> 首页</a>
+            </li>
+            <li class="nav-item">
+              <a href="https://bilibili.mikuclub.cc/" class="nav-link"><font-awesome-icon :icon="faHouse" class="align-middle me-1" /> 在线服务器版本</a>
             </li>
             <li class="nav-item">
               <a :href="bilibili_link" class="nav-link" target="_blank"><font-awesome-icon :icon="faBilibili"
-                  class="align-middle me-1" /> 初音社B站频道</a>
+                  class="align-middle me-1" /> 开发者B站频道</a>
             </li>
             <li class="nav-item">
               <a :href="github_link" class="nav-link" target="_blank"> <font-awesome-icon :icon="faGithub"

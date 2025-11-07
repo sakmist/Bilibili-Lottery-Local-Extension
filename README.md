@@ -46,5 +46,4 @@
 
 ## 参考
 
-- 原项目：`bilibili_dynamic_lottery-master`  
-- Edge 版评论采集扩展：`bilibili-comments-extension-main`
+- 原项目：`bilibili_dynamic_lottery-master`

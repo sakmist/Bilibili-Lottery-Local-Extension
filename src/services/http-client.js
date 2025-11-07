@@ -47,7 +47,7 @@ async function pauseIfNeeded() {
         delay: rule.delay,
         requestCount: requestCounter
       });
-      console.warn(`[HTTP Client] Reached ${requestCounter} requests, pausing for ${rule.delay} ms to avoid rate limiting.`);
+      // console.warn(`[HTTP Client] Reached ${requestCounter} requests, pausing for ${rule.delay} ms to avoid rate limiting.`);
       await sleep(rule.delay);
       break;
     }
@@ -98,7 +98,7 @@ export async function fetchJson(url, { method = 'GET', params = {}, signal, raw 
 
   try {
     const response = await fetch(requestUrl, fetchOptions);
-    console.debug(requestCounter,'[HTTP Client] Request:', requestUrl, fetchOptions);
+    // console.debug(requestCounter,'[HTTP Client] Request:', requestUrl, fetchOptions);
     if (!response.ok) {
       const error = new Error(`网络异常：HTTP ${response.status}`);
       error.status = response.status;

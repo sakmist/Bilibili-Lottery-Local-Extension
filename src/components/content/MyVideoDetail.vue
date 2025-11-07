@@ -332,7 +332,7 @@ function set_comment_duplicate_info() {
             user.original_comment_id = original_comment_info.id;
             user.duplicate_comment_count = original_comment_info.count;
 
-            console.log(user.user_name + ' '+user.duplicate_comment_count);
+            // console.log(user.user_name + ' '+user.duplicate_comment_count);
 
         }
         //如果不存在, 则说明是原创评论

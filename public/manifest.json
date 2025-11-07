@@ -26,6 +26,7 @@
   },
   "host_permissions": [
     "https://*.bilibili.com/*",
-    "https://passport.bilibili.com/*"
+    "https://passport.bilibili.com/*",
+    "https://www.modelscope.cn/*"
   ]
 }

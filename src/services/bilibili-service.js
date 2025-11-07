@@ -1,4 +1,4 @@
-import { fetchJson } from './http-client';
+import { fetchJson, incrementThrottleCounter } from './http-client';
 import { withWbiSignature } from './wbi';
 import { sleep } from '@/utils/utils';
 
@@ -20,6 +20,17 @@ const REACTION_TYPE = {
   FORWARD: '转发了',
   LIKE: '赞了'
 };
+
+function serializeDuplicateMap(duplicateMap) {
+  return Array.from(duplicateMap.entries()).map(([key, value]) => [key, { ...value }]);
+}
+
+function deserializeDuplicateMap(serialized) {
+  if (!Array.isArray(serialized)) {
+    return new Map();
+  }
+  return new Map(serialized.map(([key, value]) => [key, { ...value }]));
+}
 
 function isBvid(id = '') {
   return /^BV[0-9A-Za-z]+$/i.test(id);
@@ -101,6 +112,9 @@ async function fetchWithRetry(url, paramsBuilder, { signal } = {}) {
       const params = await paramsBuilder();
       return await fetchJson(url, { params, signal });
     } catch (error) {
+      if (error?.status === 412) {
+        throw error;
+      }
       attempt += 1;
       if (attempt >= MAX_RETRY) {
         throw error;
@@ -225,78 +239,115 @@ function mapOldDynamicTypeToCommentType(type) {
   }
 }
 
-export async function fetchCommentUsers({ id, detail, onProgress, signal }) {
+export async function fetchCommentUsers({ id, detail, onProgress, signal, resumeState } = {}) {
   const detailInfo = detail || await fetchDetail(id);
   if (!detailInfo.comment_area_id || !detailInfo.comment_type) {
     throw new Error('评论区参数缺失');
   }
 
   const result = [];
-  const duplicateMap = new Map();
-  let paginationStr;
-  let hasNext = true;
+  const duplicateMap = resumeState?.duplicateDigest ? deserializeDuplicateMap(resumeState.duplicateDigest) : new Map();
+  let paginationStr = resumeState?.paginationStr;
+  let hasNext = resumeState?.hasNext ?? true;
+  let processedCount = resumeState?.processedCount ?? 0;
 
-  while (hasNext) {
-    const baseParams = {
-      type: detailInfo.comment_type,
-      oid: detailInfo.comment_area_id,
-      mode: 2,
-      ps: 30,
-      ...(paginationStr ? { pagination_str: paginationStr } : {})
-    };
+  try {
+    while (hasNext) {
+      const baseParams = {
+        type: detailInfo.comment_type,
+        oid: detailInfo.comment_area_id,
+        mode: 2,
+        ps: 30,
+        ...(paginationStr ? { pagination_str: paginationStr } : {})
+      };
 
-    const response = await fetchWithRetry(API.COMMENT_LIST, () => withWbiSignature(baseParams), { signal });
-    const data = response?.data || {};
-    const replies = Array.isArray(data.replies) ? data.replies : [];
-    for (const reply of replies) {
-      result.push(...normalizeCommentNode(reply, duplicateMap));
-    }
-
-    onProgress?.(result.length, detailInfo.comment_count || 0);
-
-    const cursor = data.cursor;
-    if (cursor?.is_end === false) {
-      const offset = cursor.pagination_reply?.next_offset;
-      if (!offset && offset !== 0) {
-        throw new Error('无法读取评论翻页游标');
+      const response = await fetchWithRetry(API.COMMENT_LIST, () => withWbiSignature(baseParams), { signal });
+      const data = response?.data || {};
+      const replies = Array.isArray(data.replies) ? data.replies : [];
+      for (const reply of replies) {
+        result.push(...normalizeCommentNode(reply, duplicateMap));
       }
-      paginationStr = JSON.stringify({ offset });
-      await sleep(REQUEST_DELAY);
-    } else {
-      hasNext = false;
+
+      if (replies.length > 0) {
+        await incrementThrottleCounter(replies.length);
+      }
+
+      onProgress?.(processedCount + result.length, detailInfo.comment_count || 0);
+
+      const cursor = data.cursor;
+      if (cursor?.is_end === false) {
+        const offset = cursor.pagination_reply?.next_offset;
+        if (!offset && offset !== 0) {
+          throw new Error('无法读取评论翻页游标');
+        }
+        paginationStr = JSON.stringify({ offset });
+        await sleep(REQUEST_DELAY);
+      } else {
+        hasNext = false;
+      }
     }
+  } catch (error) {
+    if (error?.status === 412) {
+      error.isResumable = true;
+      error.partialResult = result.slice();
+      error.resumeState = {
+        paginationStr,
+        hasNext,
+        processedCount: processedCount + result.length,
+        duplicateDigest: serializeDuplicateMap(duplicateMap)
+      };
+    }
+    throw error;
   }
 
   return result;
 }
 
-export async function fetchReactionUsers({ id, detail, onProgress, signal }) {
+export async function fetchReactionUsers({ id, detail, onProgress, signal, resumeState } = {}) {
   const detailInfo = detail || await fetchDetail(id);
   const total = (detailInfo.forward_count || 0) + (detailInfo.like_count || 0);
   const result = [];
-  let offset = '';
-  let hasMore = true;
+  let offset = resumeState?.offset ?? '';
+  let hasMore = resumeState?.hasMore ?? true;
+  let processedCount = resumeState?.processedCount ?? 0;
 
-  while (hasMore) {
-    const baseParams = {
-      id,
-      ...(offset ? { offset } : {})
-    };
+  try {
+    while (hasMore) {
+      const baseParams = {
+        id,
+        ...(offset ? { offset } : {})
+      };
 
-    const response = await fetchWithRetry(API.REACTION_LIST, () => withWbiSignature(baseParams), { signal });
-    const data = response?.data || {};
-    const items = Array.isArray(data.items) ? data.items : [];
-    for (const item of items) {
-      result.push(normalizeReactionNode(item));
+      const response = await fetchWithRetry(API.REACTION_LIST, () => withWbiSignature(baseParams), { signal });
+      const data = response?.data || {};
+      const items = Array.isArray(data.items) ? data.items : [];
+      for (const item of items) {
+        result.push(normalizeReactionNode(item));
+      }
+
+      if (items.length > 0) {
+        await incrementThrottleCounter(items.length);
+      }
+
+      onProgress?.(processedCount + result.length, total);
+
+      hasMore = data.has_more === true && (processedCount + result.length) < total;
+      offset = data.offset || '';
+      if (hasMore) {
+        await sleep(REQUEST_DELAY);
+      }
     }
-
-    onProgress?.(result.length, total);
-
-    hasMore = data.has_more === true && result.length < total;
-    offset = data.offset || '';
-    if (hasMore) {
-      await sleep(REQUEST_DELAY);
+  } catch (error) {
+    if (error?.status === 412) {
+      error.isResumable = true;
+      error.partialResult = result.slice();
+      error.resumeState = {
+        offset,
+        hasMore,
+        processedCount: processedCount + result.length
+      };
     }
+    throw error;
   }
 
   return result;

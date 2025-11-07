@@ -25,10 +25,32 @@ const like_list = inject(INJECTION_KEY.LIKE_LIST);
 const forward_list = inject(INJECTION_KEY.FORWARD_LIST);
 const user_list = inject(INJECTION_KEY.USER_LIST);
 
+const is_fetching = ref(false);
+const comment_resume_state = ref(null);
+const reaction_resume_state = ref(null);
+const comment_stage_completed = ref(false);
+const reaction_stage_completed = ref(false);
+
+const STAGE_LABEL_MAP = {
+    comment: '评论',
+    reaction: '点赞/转发'
+};
+
+function clone_comment_resume_state(state) {
+    if (!state) {
+        return null;
+    }
+    return {
+        ...state,
+        duplicateDigest: Array.isArray(state.duplicateDigest)
+            ? state.duplicateDigest.map(([key, value]) => [key, { ...value }])
+            : undefined,
+    };
+}
 
 //判断是否要关闭 加载按钮
 const disable_button_get_list = computed(() => {
-    return !enable_comment_list.value && !enable_like_list.value && !enable_forward_list.value;
+    return is_fetching.value || (!enable_comment_list.value && !enable_like_list.value && !enable_forward_list.value);
 })
 
 
@@ -37,69 +59,138 @@ const disable_button_get_list = computed(() => {
 /**
  * 加载按钮点击事件
  */
-async function on_click_get_list() {
+async function on_click_get_list(options = {}) {
 
-    if (!video_id.value) {
+    if (!video_id.value || is_fetching.value) {
         return;
     }
 
-    //隐藏列表组件
-    show_list.value = false;
-    //清空列表
-    comment_list.length = 0;
-    like_list.length = 0;
-    forward_list.length = 0;
-    user_list.length = 0;
+    const { isResume = false } = options;
+    is_fetching.value = true;
+
+    if (!isResume) {
+        //隐藏列表组件
+        show_list.value = false;
+        //清空列表
+        comment_list.length = 0;
+        like_list.length = 0;
+        forward_list.length = 0;
+        user_list.length = 0;
+        comment_resume_state.value = null;
+        reaction_resume_state.value = null;
+        comment_stage_completed.value = false;
+        reaction_stage_completed.value = false;
+    }
+
+    let current_stage = '';
 
     try {
-        if (enable_comment_list.value) {
-            await run_comment_task();
-        }
-        if (enable_like_list.value || enable_forward_list.value) {
-            await run_reaction_task();
+        const should_run_comment_stage = enable_comment_list.value && !comment_stage_completed.value;
+        if (should_run_comment_stage) {
+            current_stage = 'comment';
+            const is_stage_resume = isResume && !!comment_resume_state.value;
+            await run_comment_task({ isResume: is_stage_resume });
+            comment_stage_completed.value = true;
         }
 
-        create_user_list();
+        const should_run_reaction_stage = (enable_like_list.value || enable_forward_list.value) && !reaction_stage_completed.value;
+        if (should_run_reaction_stage) {
+            current_stage = 'reaction';
+            const is_stage_resume = isResume && !!reaction_resume_state.value;
+            await run_reaction_task({ isResume: is_stage_resume });
+            reaction_stage_completed.value = true;
+        }
+
+        const should_create_user_list =
+            (!enable_comment_list.value || comment_stage_completed.value) &&
+            (!(enable_like_list.value || enable_forward_list.value) || reaction_stage_completed.value);
+
+        if (should_create_user_list) {
+            create_user_list();
+            comment_resume_state.value = null;
+            reaction_resume_state.value = null;
+        }
     } catch (error) {
-        show_error_modal(true, error.message);
+        handle_task_error(error, current_stage);
     } finally {
+        is_fetching.value = false;
         show_loading_modal(false);
     }
 }
 
-async function run_comment_task() {
-    await run_task_with_progress('拉取评论', async (updateProgress) => {
-        const response_data = await fetchCommentUsers({
-            id: video_id.value,
-            detail: video_detail,
-            onProgress: updateProgress,
-        });
+async function run_comment_task({ isResume = false } = {}) {
+    const label = isResume ? '继续拉取评论' : '拉取评论';
+    await run_task_with_progress(label, async (updateProgress) => {
+        try {
+            const response_data = await fetchCommentUsers({
+                id: video_id.value,
+                detail: video_detail,
+                onProgress: updateProgress,
+                resumeState: isResume ? comment_resume_state.value : undefined,
+            });
 
-        const array_user_model = response_data.map((element) => new User_Model(element));
-        for (const user_model of array_user_model) {
-            comment_list.push(user_model);
+            comment_resume_state.value = null;
+            append_comment_users(response_data);
+        } catch (error) {
+            if (error?.status === 412 && error?.isResumable) {
+                if (Array.isArray(error.partialResult)) {
+                    append_comment_users(error.partialResult);
+                }
+                comment_resume_state.value = clone_comment_resume_state(error.resumeState);
+            }
+            throw error;
         }
     });
 }
 
-async function run_reaction_task() {
-    await run_task_with_progress('拉取点赞/转发', async (updateProgress) => {
-        const response_data = await fetchReactionUsers({
-            id: video_id.value,
-            detail: video_detail,
-            onProgress: updateProgress,
-        });
+async function run_reaction_task({ isResume = false } = {}) {
+    const label = isResume ? '继续拉取点赞/转发' : '拉取点赞/转发';
+    await run_task_with_progress(label, async (updateProgress) => {
+        try {
+            const response_data = await fetchReactionUsers({
+                id: video_id.value,
+                detail: video_detail,
+                onProgress: updateProgress,
+                resumeState: isResume ? reaction_resume_state.value : undefined,
+            });
 
-        const array_user_model = response_data.map((element) => new User_Model(element));
-        for (const user_model of array_user_model) {
-            if (user_model.action === REACTION_TYPE.LIKE) {
-                like_list.push(user_model);
+            reaction_resume_state.value = null;
+            append_reaction_users(response_data);
+        } catch (error) {
+            if (error?.status === 412 && error?.isResumable) {
+                if (Array.isArray(error.partialResult)) {
+                    append_reaction_users(error.partialResult);
+                }
+                reaction_resume_state.value = error.resumeState ? { ...error.resumeState } : null;
             }
-            else if (user_model.action === REACTION_TYPE.FORWARD) {
-                forward_list.push(user_model);
-            }
+            throw error;
         }
     });
+}
+
+function append_comment_users(data = []) {
+    if (!Array.isArray(data) || data.length === 0) {
+        return;
+    }
+    const array_user_model = data.map((element) => new User_Model(element));
+    for (const user_model of array_user_model) {
+        comment_list.push(user_model);
+    }
+}
+
+function append_reaction_users(data = []) {
+    if (!Array.isArray(data) || data.length === 0) {
+        return;
+    }
+    const array_user_model = data.map((element) => new User_Model(element));
+    for (const user_model of array_user_model) {
+        if (user_model.action === REACTION_TYPE.LIKE) {
+            like_list.push(user_model);
+        }
+        else if (user_model.action === REACTION_TYPE.FORWARD) {
+            forward_list.push(user_model);
+        }
+    }
 }
 
 async function run_task_with_progress(label, runner) {
@@ -108,6 +199,22 @@ async function run_task_with_progress(label, runner) {
         const total_text = total ? ` / ${total}` : '';
         show_loading_modal(true, `${label}：${current}${total_text}`);
     });
+}
+
+function handle_task_error(error, stage_key) {
+    if (error?.status === 412 && error?.isResumable) {
+        const stage_label = STAGE_LABEL_MAP[stage_key] || '数据';
+        const resume_message = `触发 B 站风控 (HTTP 412)，${stage_label}加载已暂停。<br/>请等待几秒后点击“继续”从断点恢复。`;
+        show_error_modal(true, {
+            content: resume_message,
+            show_confirm_button: true,
+            confirm_text: '继续',
+            onConfirm: () => on_click_get_list({ isResume: true })
+        });
+        return;
+    }
+
+    show_error_modal(true, error.message);
 }
 
 
@@ -188,6 +295,7 @@ function create_user_list() {
     }
 
     //重新生成最终的用户列表 
+    user_list.length = 0;
     user_list.push(...temp_list);
     //检测评论是否为原创评论, 并设置相关信息
     set_comment_duplicate_info();
@@ -258,6 +366,10 @@ watch(video_id, () => {
     like_list.length = 0;
     forward_list.length = 0;
     user_list.length = 0;
+    comment_resume_state.value = null;
+    reaction_resume_state.value = null;
+    comment_stage_completed.value = false;
+    reaction_stage_completed.value = false;
 
 })
 
@@ -345,12 +457,6 @@ watch(video_id, () => {
             </div>
 
             <div class="col-12 text-center">
-
-                <div class="my-2 alert alert-danger">
-                     <span class="badge text-bg-danger">注意</span> 
-                     因为B站服务器逆天的反爬虫机制, 每次发出一定数量的请求, 就被导致本程序的IP被B站拉黑一段时间, 所以如果提示触发了风控错误, 只能等待1小时后再重试, 没有任何解决办法, 或者你可以从本项目的GITHUB上下载源码, 自行部署到本地或者自己的服务器上使用
-                     <button type="button" class="btn-close ms-1" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
 
                 <div v-if="enable_comment_list && (enable_like_list || enable_forward_list)"
                     class="my-2 alert alert-warning">

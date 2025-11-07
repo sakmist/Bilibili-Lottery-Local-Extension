@@ -38,6 +38,14 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    confirm_text: {
+        type: String,
+        default: '确认',
+    },
+    cancel_text: {
+        type: String,
+        default: '关闭',
+    },
 })
 
 
@@ -67,9 +75,9 @@ const props = defineProps({
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary px-4 me-2 cancel"
-                            :class="{ 'd-none': !show_cancel_button }" @click="$emit('close')">关闭</button>
+                            :class="{ 'd-none': !show_cancel_button }" @click="$emit('close')">{{ cancel_text }}</button>
                         <button type="button" class="btn btn-primary px-4 me-2 confirm"
-                            :class="{ 'd-none': !show_confirm_button }" @click="$emit('confirm')">确认</button>
+                            :class="{ 'd-none': !show_confirm_button }" @click="$emit('confirm')">{{ confirm_text }}</button>
                     </div>
                 </div>
             </div>

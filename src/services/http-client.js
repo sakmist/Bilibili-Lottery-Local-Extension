@@ -1,3 +1,25 @@
+import { sleep } from '@/utils/utils';
+
+const REQUEST_PAUSE_RULES = [
+  { threshold: 1000, delay: 10_000 },
+  { threshold: 100, delay: 5_000 }
+];
+
+let requestCounter = 0;
+
+async function pauseIfNeeded() {
+  if (requestCounter === 0) {
+    return;
+  }
+
+  for (const { threshold, delay } of REQUEST_PAUSE_RULES) {
+    if (requestCounter % threshold === 0) {
+      await sleep(delay);
+      break;
+    }
+  }
+}
+
 /**
  * 简易的 B 站 API 客户端
  * 在浏览器扩展环境里发起跨域请求时，需要带上 cookie 以复用用户登录态。
@@ -31,22 +53,27 @@ export async function fetchJson(url, { method = 'GET', params = {}, signal, raw 
     fetchOptions.body = JSON.stringify(params);
   }
 
-  const response = await fetch(requestUrl, fetchOptions);
-  if (!response.ok) {
-    throw new Error(`网络异常：HTTP ${response.status}`);
-  }
+  try {
+    const response = await fetch(requestUrl, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`网络异常：HTTP ${response.status}`);
+    }
 
-  const data = raw ? await response.text() : await response.json();
+    const data = raw ? await response.text() : await response.json();
 
-  if (raw) {
+    if (raw) {
+      return data;
+    }
+
+    const code = typeof data.code === 'number' ? data.code : 0;
+    if (code !== 0) {
+      const message = data.message || data.msg || `接口返回错误码：${code}`;
+      throw new Error(message);
+    }
+
     return data;
+  } finally {
+    requestCounter += 1;
+    await pauseIfNeeded();
   }
-
-  const code = typeof data.code === 'number' ? data.code : 0;
-  if (code !== 0) {
-    const message = data.message || data.msg || `接口返回错误码：${code}`;
-    throw new Error(message);
-  }
-
-  return data;
 }

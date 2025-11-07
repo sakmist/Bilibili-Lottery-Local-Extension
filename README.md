@@ -2,6 +2,7 @@
 
 本项目基于 `bilibili_dynamic_lottery` 的 Vue 前端，移除了 PHP 后端，改造成一个完全在本地运行的浏览器插件。插件直接调用哔哩哔哩公开接口（评论、转发、点赞等），所有请求都通过用户自己的登录态发出，不经过第三方服务器。
 
+国内下载链接https://www.modelscope.cn/models/sakmist/Bilibili-Lottery-Local-Extension/resolve/master/Bilibili-Lottery-Local-Extension.zip
 ## 功能亮点
 
 - 解析视频 / 动态链接，显示作者及互动数据。  

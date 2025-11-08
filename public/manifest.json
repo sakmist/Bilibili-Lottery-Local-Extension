@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Bilibili Lottery Local",
   "description": "纯本地运行的B站抽奖工具插件",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "action": {
     "default_icon": {
       "16": "icons/icon16.png",

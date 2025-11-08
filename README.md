@@ -2,6 +2,10 @@
 
 本项目基于 `bilibili_dynamic_lottery` 的 Vue 前端，移除了 PHP 后端，改造成一个完全在本地运行的浏览器插件。插件直接调用哔哩哔哩公开接口（评论、转发、点赞等），所有请求都通过用户自己的登录态发出，不经过第三方服务器。
 
+国内下载链接https://www.modelscope.cn/models/sakmist/Bilibili-Lottery-Local-Extension/resolve/master/Bilibili-Lottery-Local-Extension.zip
+
+<img width="2756" height="1596" alt="837dcab18faea619abc9f5781f56afd7" src="https://github.com/user-attachments/assets/b5bf9a77-9309-4edb-a776-5d393aaef8ba" />
+
 ## 功能亮点
 
 - 解析视频 / 动态链接，显示作者及互动数据。  
@@ -33,17 +37,10 @@
 
 ## 浏览器加载方式
 
-1. 运行 `npm run build` 生成最新的 `dist/`。  
-2. 打开 Chrome / Edge 扩展页面（`chrome://extensions` 或 `edge://extensions`）。  
-3. 打开「开发者模式」，点击「加载已解压的扩展程序」，选择 `dist/` 目录。  
-4. 在浏览器正常登录 B 站后，点击插件图标即可使用；如需要刷新登录状态，可点击右上角用户名。
+1. 打开 Chrome / Edge 扩展页面（`chrome://extensions` 或 `edge://extensions`）。  
+2. 打开「开发者模式」，点击「加载已解压的扩展程序」，选择 `dist/` 目录。  
+3. 在浏览器正常登录 B 站后，点击插件图标即可使用；如需要刷新登录状态，可点击右上角用户名。
 
-## 版本校验与一键下载
-
-- 插件启动后会访问 `VITE_VERSION_CHECK_URL`（默认指向 ModelScope 中的 `verson` 文件）同步远程版本号，并在页面底部展示当前版本与本地 MD5。  
-- 若检测到远程版本不同，会弹出提示弹窗，请点击「立即下载」后手动在浏览器保存新版压缩包，并前往 `chrome://extensions` 替换。  
-- 下载完成后会记录压缩包 MD5、体积与下载时间，方便复核；你也可以再次点击底部按钮重新拉取。  
-- 需要自定义版本源或下载地址时，可在 `.env` 中调整 `VITE_VERSION_CHECK_URL`、`VITE_UPDATE_PACKAGE_URL` 与 `VITE_UPDATE_PACKAGE_FILENAME`。
 
 ## 注意事项
 
@@ -54,4 +51,4 @@
 
 ## 参考
 
-- 原项目：`bilibili_dynamic_lottery-master`
+- 原项目：[bilibili_dynamic_lottery-master](https://github.com/hexie2108/bilibili_dynamic_lottery)

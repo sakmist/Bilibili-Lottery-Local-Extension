@@ -25,6 +25,7 @@ const comment_list = inject(INJECTION_KEY.COMMENT_LIST);
 const like_list = inject(INJECTION_KEY.LIKE_LIST);
 const forward_list = inject(INJECTION_KEY.FORWARD_LIST);
 const user_list = inject(INJECTION_KEY.USER_LIST);
+const video_url = inject(INJECTION_KEY.VIDEO_URL);
 
 
 const login_user = inject(INJECTION_KEY.LOGIN_USER)
@@ -226,6 +227,52 @@ function reset_result_status() {
 }
 
 
+function csv_escape(value) {
+    if (value === undefined || value === null) {
+        return '';
+    }
+    const string_value = String(value).replace(/"/g, '""');
+    return /[",\n]/.test(string_value) ? `"${string_value}"` : string_value;
+}
+
+function downloadFilteredCommentData() {
+    if (!enable_comment_list.value) {
+        show_error_modal(true, '只有评论列表支持导出');
+        return;
+    }
+
+    if (!filtered_list.value.length) {
+        show_error_modal(true, '当前没有可导出的评论数据');
+        return;
+    }
+
+    const comment_base_url = video_url?.value || '';
+
+    const headers = ['名字', '评论', '评论时间', 'uid', '评论链接', '用户等级', '是否会员'];
+    const rows = filtered_list.value.map(user => {
+        const comment_link = user.reply_id ? `${comment_base_url}#reply${user.reply_id}` : comment_base_url;
+        return [
+            user.user_name || '',
+            user.content || '',
+            user.date || '',
+            user.id ?? '',
+            comment_link || '',
+            user.level ?? '',
+            user.vip ? '是' : '否',
+        ];
+    });
+
+    const csv_content = [headers, ...rows].map(row => row.map(csv_escape).join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csv_content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `筛选评论_${format_date_to_string(new Date()).replace(/[: ]/g, '_')}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+}
 
 
 
@@ -321,38 +368,50 @@ function reset_result_status() {
                 </div>
 
                 <div v-if="enable_comment_list" class="col-12 col-xl-10">
-
-                    <div class="input-group">
-                        <div class="input-group-text">
-                            评论内容包含
+                    <div class="row g-2 align-items-center">
+                        <div class="col-12 col-lg-4">
+                            <div class="input-group">
+                                <div class="input-group-text">
+                                    评论内容包含
+                                </div>
+                                <input v-model.lazy="content_filter" class="form-control" type="text"
+                                    placeholder="不限制" :disabled="result_status" />
+                            </div>
                         </div>
-                        <input v-model.lazy="content_filter" class="form-control" type="text" placeholder="不限制"
-                            :disabled="result_status" />
-                        <div class="input-group-text">
-                            最早评论时间
+                        <div class="col-12 col-lg-4">
+                            <div class="input-group">
+                                <div class="input-group-text">
+                                    最早评论时间
+                                </div>
+                                <div class="flex-grow-1">
+                                    <VueDatePicker v-model="date_comment_filter_start" auto-apply placeholder="不限制"
+                                        locale="zh" format="yyyy-MM-dd HH:mm:ss" :disabled="result_status"
+                                        class="w-100" />
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <VueDatePicker v-model="date_comment_filter_start" auto-apply placeholder="不限制" locale="zh"
-                                format="yyyy-MM-dd HH:mm:ss" :disabled="result_status" />
+                        <div class="col-12 col-lg-4">
+                            <div class="input-group">
+                                <div class="input-group-text">
+                                    最晚评论时间
+                                </div>
+                                <div class="flex-grow-1">
+                                    <VueDatePicker v-model="date_comment_filter_end" auto-apply placeholder="不限制"
+                                        locale="zh" format="yyyy-MM-dd HH:mm:ss" :disabled="result_status"
+                                        class="w-100" />
+                                </div>
+                            </div>
                         </div>
-
-                        <div class="input-group-text">
-                            最晚评论时间
+                        <div class="col-12 col-lg-4">
+                            <button class="input-group-text" :disabled="!filtered_list.length"
+                                @click="downloadFilteredCommentData">
+                                导出筛选评论
+                            </button>
                         </div>
-
-                        <div>
-                            <VueDatePicker v-model="date_comment_filter_end" auto-apply placeholder="不限制" locale="zh"
-                                format="yyyy-MM-dd HH:mm:ss" :disabled="result_status" />
-                        </div>
-
                     </div>
-
-
                 </div>
 
                 <div class="col-12 col-xl-10 text-center">
-
-
 
                     <button v-show="!result_status" class="btn btn-miku btn-lg mt-2"
                         @click="calculate_array_result_list">开始抽选</button>
@@ -360,6 +419,8 @@ function reset_result_status() {
                         @click="reset_result_status">重置列表&重新抽选</button>
 
                 </div>
+
+
 
                 <div v-show="result_status" class="col-12 col-xl-10 text-center">
 

@@ -2,7 +2,8 @@
 
 本项目基于 `bilibili_dynamic_lottery` 的 Vue 前端，移除了 PHP 后端，改造成一个完全在本地运行的浏览器插件。插件直接调用哔哩哔哩公开接口（评论、转发、点赞等），所有请求都通过用户自己的登录态发出，不经过第三方服务器。
 
-国内下载链接https://www.modelscope.cn/models/sakmist/Bilibili-Lottery-Local-Extension/resolve/master/Bilibili-Lottery-Local-Extension.zip
+- 国内下载链接：https://www.modelscope.cn/models/sakmist/Bilibili-Lottery-Local-Extension/resolve/master/Bilibili-Lottery-Local-Extension.zip
+- Edge 插件商店下载：https://microsoftedge.microsoft.com/addons/detail/bilibili-lottery-local/emklklgjhjjippfejbefinlckfjccicc
 
 <img width="2756" height="1596" alt="837dcab18faea619abc9f5781f56afd7" src="https://github.com/user-attachments/assets/b5bf9a77-9309-4edb-a776-5d393aaef8ba" />
 
